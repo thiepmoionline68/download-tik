@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader - Process & Save TikTok Videos</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+        
+        /* Custom scrollbar for textarea */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Line clamp for video titles */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+
+        /* Smooth transitions */
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 300ms;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 text-white p-1.5 rounded-lg">
+                    <i class="ph-bold ph-video-camera text-xl block"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Video Downloader</h1>
+                    <p class="text-xs text-slate-500">Download and save your videos</p>
+                </div>
+            </div>
+            <a href="https://github.com" target="_blank" class="text-slate-400 hover:text-slate-600 transition-colors">
+                <i class="ph ph-github-logo text-2xl"></i>
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+        
+        <!-- Input Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <div class="flex justify-between items-end mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold mb-1">Enter Video URLs</h2>
+                    <p class="text-sm text-slate-500">Paste TikTok video links below. One URL per line.</p>
+                </div>
+                <div class="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                    <span id="urlCount">0</span> URLs detected
+                </div>
+            </div>
+
+            <div class="relative mb-4">
+                <textarea 
+                    id="urlInput" 
+                    rows="6" 
+                    class="w-full w-full bg-slate-50 border border-slate-300 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow resize-y"
+                    placeholder="https://www.tiktok.com/@user/video/1234567890&#10;https://www.tiktok.com/@user/video/0987654321..."
+                ></textarea>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <button 
+                    id="clearBtn"
+                    class="text-sm text-slate-500 hover:text-red-500 font-medium transition-colors px-2 py-1 rounded hidden"
+                >
+                    Clear Input
+                </button>
+                <button 
+                    id="processBtn" 
+                    class="ml-auto bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled
+                >
+                    <i class="ph ph-magic-wand text-lg"></i>
+                    <span>Process Videos</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="hidden flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div>
+                    <h2 class="text-xl font-semibold">Found Videos: <span id="foundCount">0</span></h2>
+                    <p id="processStatus" class="text-sm text-slate-500">Ready</p>
+                </div>
+                <button 
+                    id="downloadAllBtn" 
+                    class="bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 px-5 rounded-lg shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+                >
+                    <i class="ph ph-download-simple text-lg"></i>
+                    <span>Download All</span>
+                </button>
+            </div>
+
+            <!-- Download All Progress -->
+            <div id="bulkProgressContainer" class="hidden w-full bg-slate-100 rounded-full h-2.5 mt-2">
+                <div id="bulkProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                <p id="bulkProgressText" class="text-xs text-slate-500 mt-1 text-center">Downloading 0 / 0</p>
+            </div>
+
+            <!-- Video List (Changed from Grid to vertical list) -->
+            <div id="videoGrid" class="flex flex-col gap-3">
+                <!-- Video cards will be injected here -->
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-6xl mx-auto px-4 py-6 text-center">
+            <p class="text-xs text-slate-400 max-w-2xl mx-auto">
+                <strong>Disclaimer:</strong> Use this tool only for videos you have permission to download or use. You are responsible for respecting copyright and applicable laws. This website is not affiliated with, endorsed, or sponsored by TikTok.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // --- State Management ---
+        const STATUS = {
+            WAITING: 'waiting',
+            PROCESSING: 'processing',
+            FOUND: 'found',
+            DOWNLOADING: 'downloading',
+            DOWNLOADED: 'downloaded',
+            FAILED: 'failed'
+        };
+
+        const state = {
+            isProcessing: false,
+            isDownloadingAll: false,
+            queue: [], // Array of video objects
+            resultsMap: new Map() // Fast lookup for DOM updates
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            input: document.getElementById('urlInput'),
+            count: document.getElementById('urlCount'),
+            processBtn: document.getElementById('processBtn'),
+            clearBtn: document.getElementById('clearBtn'),
+            resultsSection: document.getElementById('resultsSection'),
+            foundCount: document.getElementById('foundCount'),
+            processStatus: document.getElementById('processStatus'),
+            grid: document.getElementById('videoGrid'),
+            downloadAllBtn: document.getElementById('downloadAllBtn'),
+            bulkProgress: document.getElementById('bulkProgressContainer'),
+            bulkProgressBar: document.getElementById('bulkProgressBar'),
+            bulkProgressText: document.getElementById('bulkProgressText')
+        };
+
+        // --- Utility Functions ---
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+        
+        const isValidUrl = (string) => {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;  
+            }
+        };
+
+        const extractUrls = (text) => {
+            if (!text) return [];
+            const lines = text.split('\n');
+            const uniqueUrls = new Set();
+            
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                // Basic check for tiktok url pattern, could be more robust
+                if (trimmed && isValidUrl(trimmed) && trimmed.includes('tiktok.com')) {
+                    uniqueUrls.add(trimmed);
+                }
+            });
+            
+            return Array.from(uniqueUrls);
+        };
+
+        // --- STREAMING_CHUNK:Event Listeners & Input Handling ---
+        
+        // Handle textarea input
+        els.input.addEventListener('input', () => {
+            const urls = extractUrls(els.input.value);
+            els.count.textContent = urls.length;
+            
+            if (urls.length > 0 && !state.isProcessing) {
+                els.processBtn.disabled = false;
+                els.clearBtn.classList.remove('hidden');
+            } else {
+                els.processBtn.disabled = true;
+                if (els.input.value.trim() === '') els.clearBtn.classList.add('hidden');
+            }
+        });
+
+        // Clear button
+        els.clearBtn.addEventListener('click', () => {
+            els.input.value = '';
+            els.input.dispatchEvent(new Event('input'));
+        });
+
+        // Process button
+        els.processBtn.addEventListener('click', startProcessing);
+
+        // Download All button
+        els.downloadAllBtn.addEventListener('click', handleDownloadAll);
+
+        // --- STREAMING_CHUNK:Core Processing Logic ---
+
+        async function startProcessing() {
+            const urls = extractUrls(els.input.value);
+            if (urls.length === 0) return;
+
+            // Update UI State
+            state.isProcessing = true;
+            els.processBtn.disabled = true;
+            els.input.disabled = true;
+            els.processBtn.innerHTML = `<i class="ph ph-spinner animate-spin text-lg"></i><span>Processing...</span>`;
+            
+            // Initialize Queue
+            state.queue = urls.map(url => ({
+                id: generateId(),
+                originalUrl: url,
+                status: STATUS.WAITING,
+                data: null,
+                error: null
+            }));
+            state.resultsMap.clear();
+
+            // Prepare Results Area
+            els.resultsSection.classList.remove('hidden');
+            els.grid.innerHTML = '';
+            els.downloadAllBtn.classList.add('hidden');
+            els.foundCount.textContent = '0';
+            els.processStatus.textContent = `Processing 0 of ${state.queue.length} URLs...`;
+            
+            // Render initial skeleton cards
+            state.queue.forEach(item => {
+                state.resultsMap.set(item.id, item);
+                els.grid.insertAdjacentHTML('beforeend', createVideoCardHTML(item));
+            });
+
+            // Process sequentially
+            let successCount = 0;
+            for (let i = 0; i < state.queue.length; i++) {
+                const item = state.queue[i];
+                
+                // Update specific card to processing
+                updateItemStatus(item.id, STATUS.PROCESSING);
+                els.processStatus.textContent = `Processing ${i + 1} of ${state.queue.length}...`;
+
+                try {
+                    const data = await fetchVideoData(item.originalUrl);
+                    item.data = data;
+                    updateItemStatus(item.id, STATUS.FOUND);
+                    successCount++;
+                    els.foundCount.textContent = successCount;
+                } catch (error) {
+                    item.error = error.message;
+                    updateItemStatus(item.id, STATUS.FAILED);
+                }
+                
+                // Optional: small delay to avoid hammering the API too hard
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            // Finish processing
+            state.isProcessing = false;
+            els.processBtn.disabled = false;
+            els.input.disabled = false;
+            els.processBtn.innerHTML = `<i class="ph ph-magic-wand text-lg"></i><span>Process Again</span>`;
+            els.processStatus.textContent = `Finished processing. Found ${successCount} videos.`;
+            
+            if (successCount > 0) {
+                els.downloadAllBtn.classList.remove('hidden');
+                els.downloadAllBtn.disabled = false;
+            }
+        }
+
+        // --- STREAMING_CHUNK:API Integration & Data Mapping ---
+
+        async function fetchVideoData(url) {
+            const apiUrl = 'https://www.tikwm.com/api/';
+            
+            // Using URLSearchParams for x-www-form-urlencoded format
+            const params = new URLSearchParams();
+            params.append('url', url);
+            params.append('count', '12');
+            params.append('cursor', '0');
+            params.append('web', '1');
+            params.append('hd', '1');
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'Accept': 'application/json'
+                    },
+                    body: params
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.code !== 0) {
+                    throw new Error(result.msg || 'API returned an error');
+                }
+
+                if (!result.data) {
+                     throw new Error('Video information not found');
+                }
+
+                const domain = 'https://www.tikwm.com';
+                const getFullUrl = (path) => {
+                    if (!path) return null;
+                    if (path.startsWith('http')) return path;
+                    return domain + (path.startsWith('/') ? '' : '/') + path;
+                };
+
+                // Map to internal model
+                return {
+                    videoId: result.data.id || generateId(),
+                    title: result.data.title || 'Untitled Video',
+                    thumbnail: getFullUrl(result.data.cover) || getFullUrl(result.data.origin_cover) || 'https://placehold.co/400x600/e2e8f0/64748b?text=No+Thumbnail',
+                    username: result.data.author?.unique_id || 'Unknown User',
+                    videoUrl: getFullUrl(result.data.play),
+                    hdVideoUrl: getFullUrl(result.data.hdplay) || getFullUrl(result.data.play), // Fallback to normal if HD absent
+                    duration: result.data.duration || 0
+                };
+
+            } catch (error) {
+                console.error("API Error:", error);
+                throw new Error(error.message || 'Failed to fetch video data');
+            }
+        }
+
+        // --- STREAMING_CHUNK:UI Rendering & Updates ---
+
+        function createVideoCardHTML(item) {
+            return `
+                <div id="card-${item.id}" class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row sm:items-center justify-between p-4 transition-all hover:shadow gap-4">
+                    ${getCardContentHTML(item)}
+                </div>
+            `;
+        }
+
+        function getCardContentHTML(item) {
+            const badge = getBadgeHTML(item.status);
+            
+            if (item.status === STATUS.WAITING) {
+                return `
+                    <div class="flex-grow flex items-center gap-3">
+                        <i class="ph ph-clock text-slate-400 text-xl"></i>
+                        <span class="text-slate-500 text-sm">Waiting in queue...</span>
+                    </div>
+                    <div>${badge}</div>
+                `;
+            }
+            if (item.status === STATUS.PROCESSING) {
+                return `
+                    <div class="flex-grow flex items-center gap-3">
+                        <i class="ph ph-spinner-gap animate-spin text-blue-500 text-xl"></i>
+                        <span class="text-blue-500 text-sm animate-pulse">Extracting data...</span>
+                    </div>
+                    <div>${badge}</div>
+                `;
+            }
+            if (item.status === STATUS.FAILED) {
+                return `
+                    <div class="flex-grow flex flex-col justify-center">
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="ph-fill ph-warning-circle text-red-500 text-lg"></i>
+                            <span class="text-red-600 font-medium text-sm">Failed to process</span>
+                        </div>
+                        <p class="text-xs text-slate-500 line-clamp-1" title="${item.error}">${item.error || 'Invalid URL or private video'}</p>
+                        <p class="text-xs text-slate-400 truncate mt-1" title="${item.originalUrl}">${item.originalUrl}</p>
+                    </div>
+                    <div>${badge}</div>
+                `;
+            }
+
+            // Found, Downloading, Downloaded states
+            let btnClass = "bg-blue-50 hover:bg-blue-100 text-blue-700";
+            let btnIcon = "ph-bold ph-download-simple";
+            let btnText = "Download";
+            let btnDisabled = "";
+            
+            if (item.status === STATUS.DOWNLOADING) {
+                btnClass = "bg-slate-100 text-slate-500";
+                btnIcon = "ph ph-spinner animate-spin";
+                btnText = "Downloading...";
+                btnDisabled = "disabled";
+            } else if (item.status === STATUS.DOWNLOADED) {
+                btnClass = "bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+                btnIcon = "ph-bold ph-check";
+                btnText = "Downloaded";
+                btnDisabled = "disabled"; // Optionally remove if you want to allow re-download
+            }
+
+            return `
+                <div class="flex-grow flex flex-col justify-center min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <div class="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600 font-bold flex-shrink-0">
+                            <i class="ph-fill ph-user"></i>
+                        </div>
+                        <span class="text-sm font-medium text-slate-700 truncate">@${item.data.username}</span>
+                        <div class="ml-2">${badge}</div>
+                    </div>
+                    <h3 class="text-sm font-semibold text-slate-900 truncate" title="${item.data.title}">${item.data.title}</h3>
+                    <p class="text-xs text-slate-400 truncate mt-1" title="${item.originalUrl}">${item.originalUrl}</p>
+                </div>
+                
+                <div class="flex-shrink-0 mt-3 sm:mt-0">
+                    <button 
+                        id="btn-dl-${item.id}"
+                        onclick="handleSingleDownload('${item.id}')"
+                        class="${btnClass} w-full sm:w-auto font-medium py-2 px-5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+                        ${btnDisabled}
+                    >
+                        <i class="${btnIcon} text-lg"></i>
+                        <span>${btnText}</span>
+                    </button>
+                </div>
+            `;
+        }
+
+        function getBadgeHTML(status) {
+            switch(status) {
+                case STATUS.WAITING: return `<span class="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-md border border-slate-200">WAITING</span>`;
+                case STATUS.PROCESSING: return `<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-md border border-blue-200 flex items-center gap-1"><i class="ph ph-spinner animate-spin"></i> PROCESSING</span>`;
+                case STATUS.FOUND: return `<span class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1"><i class="ph-bold ph-check"></i> READY</span>`;
+                case STATUS.DOWNLOADING: return `<span class="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-md border border-amber-200 flex items-center gap-1"><i class="ph ph-spinner animate-spin"></i> DOWNLOADING</span>`;
+                case STATUS.DOWNLOADED: return `<span class="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-md border border-indigo-200 flex items-center gap-1"><i class="ph-bold ph-check-circle"></i> SAVED</span>`;
+                case STATUS.FAILED: return `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-md border border-red-200 flex items-center gap-1"><i class="ph-bold ph-x"></i> FAILED</span>`;
+                default: return '';
+            }
+        }
+
+        function updateItemStatus(id, newStatus) {
+            const item = state.resultsMap.get(id);
+            if (!item) return;
+            item.status = newStatus;
+
+            const card = document.getElementById(`card-${id}`);
+            if (card) {
+                card.outerHTML = createVideoCardHTML(item);
+            }
+        }
+
+        // --- STREAMING_CHUNK:Download Functionality ---
+
+        async function triggerDownloadFile(url, filename) {
+            try {
+                // Approach 1: Try fetching as Blob to enforce filename and handle potential cross-origin issues securely within JS
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response not ok');
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(blobUrl);
+                }, 100);
+                
+                return true;
+            } catch (err) {
+                console.warn('Blob fetch failed, falling back to direct link click', err);
+                // Approach 2: Fallback. Open in new tab or rely on browser's handling of download attr.
+                // Note: Filename enforcement might fail here if cross-origin without proper headers.
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.target = '_blank'; // Opens in new tab if browser refuses to download directly
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                return true; 
+            }
+        }
+
+        async function handleSingleDownload(id) {
+            const item = state.resultsMap.get(id);
+            if (!item || !item.data) return;
+            
+            if (item.status === STATUS.DOWNLOADING || item.status === STATUS.DOWNLOADED) return;
+            
+            updateItemStatus(id, STATUS.DOWNLOADING);
+
+            const urlToDownload = item.data.hdVideoUrl || item.data.videoUrl;
+            const filename = `tiktok_${item.data.username}_${item.data.videoId}.mp4`;
+
+            try {
+                await triggerDownloadFile(urlToDownload, filename);
+                updateItemStatus(id, STATUS.DOWNLOADED);
+            } catch (error) {
+                console.error("Download error:", error);
+                // Revert status so user can try again
+                updateItemStatus(id, STATUS.FOUND);
+            }
+        }
+
+        async function handleDownloadAll() {
+            if (state.isDownloadingAll) return;
+            
+            const downloadableItems = state.queue.filter(item => 
+                item.status === STATUS.FOUND || item.status === STATUS.FAILED // Allow retrying failed downloads
+            );
+
+            if (downloadableItems.length === 0) return;
+
+            state.isDownloadingAll = true;
+            els.downloadAllBtn.disabled = true;
+            els.downloadAllBtn.innerHTML = `<i class="ph ph-spinner animate-spin text-lg"></i><span>Downloading...</span>`;
+            
+            els.bulkProgress.classList.remove('hidden');
+            els.bulkProgressBar.style.width = '0%';
+            
+            let successCount = 0;
+            const total = downloadableItems.length;
+
+            for (let i = 0; i < total; i++) {
+                const item = downloadableItems[i];
+                els.bulkProgressText.textContent = `Downloading ${i + 1} of ${total} (${item.data?.username || 'video'})`;
+                
+                // Only trigger if not already downloaded
+                if (item.status !== STATUS.DOWNLOADED) {
+                     await handleSingleDownload(item.id);
+                }
+
+                if (state.resultsMap.get(item.id).status === STATUS.DOWNLOADED) {
+                    successCount++;
+                }
+
+                // Update progress bar
+                const percent = ((i + 1) / total) * 100;
+                els.bulkProgressBar.style.width = `${percent}%`;
+
+                // Add a slightly larger delay between automated downloads to prevent browser blocking multiple popups/requests
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            // Finish Download All sequence
+            state.isDownloadingAll = false;
+            els.bulkProgressText.textContent = `Completed! Saved ${successCount} of ${total} videos.`;
+            els.downloadAllBtn.innerHTML = `<i class="ph-bold ph-check-circle text-lg"></i><span>All Done</span>`;
+            
+            setTimeout(() => {
+                els.bulkProgress.classList.add('hidden');
+                els.downloadAllBtn.disabled = false;
+                els.downloadAllBtn.innerHTML = `<i class="ph ph-download-simple text-lg"></i><span>Download Remaining</span>`;
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>
